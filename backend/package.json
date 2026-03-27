@@ -1,0 +1,14 @@
+{
+  "name": "egazette-backend",
+  "version": "1.0.0",
+  "description": "Backend API for Gazette Publication System",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "@supabase/supabase-js": "^2.43.3",
+    "dotenv": "^16.4.1"
+  }
+}
