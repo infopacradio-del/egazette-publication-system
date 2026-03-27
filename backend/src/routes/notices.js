@@ -2,12 +2,10 @@ const express = require('express');
 const router = express.Router();
 
 const { generateNoticeReference } = require('../utils/referenceGenerator');
-
-// Temporary in-memory store (mock database)
-const notices = [];
+const supabase = require('../config/supabaseClient');
 
 // POST /notices
-router.post('/', (req, res) => {
+router.post('/', async (req, res) => {
   const {
     noticeType,
     noticeCode,
@@ -22,12 +20,21 @@ router.post('/', (req, res) => {
     });
   }
 
-  // Simulated sequence number logic
-  const sameDayNotices = notices.filter(
-    n => n.publicationDate === publicationDate && n.noticeCode === noticeCode
-  );
+  // Get existing notices for the same date & notice type
+  const { data: existingNotices, error: countError } = await supabase
+    .from('notices')
+    .select('id')
+    .eq('publication_date', publicationDate)
+    .eq('notice_code', noticeCode);
 
-  const sequenceNumber = sameDayNotices.length + 1;
+  if (countError) {
+    return res.status(500).json({
+      error: 'Failed to determine notice sequence',
+      details: countError.message
+    });
+  }
+
+  const sequenceNumber = existingNotices.length + 1;
 
   const referenceNumber = generateNoticeReference({
     publicationDate,
@@ -35,24 +42,35 @@ router.post('/', (req, res) => {
     sequenceNumber
   });
 
-  const notice = {
-    id: notices.length + 1,
-    referenceNumber,
-    noticeType,
-    noticeCode,
-    province,
-    customerId,
-    publicationDate,
-    status: 'submitted',
-    createdAt: new Date().toISOString()
-  };
+  // Insert notice into database
+  const { data, error } = await supabase
+    .from('notices')
+    .insert([
+      {
+        reference_number: referenceNumber,
+        notice_type: noticeType,
+        notice_code: noticeCode,
+        province,
+        customer_id: customerId,
+        publication_date: publicationDate,
+        status: 'submitted'
+      }
+    ])
+    .select()
+    .single();
 
-  notices.push(notice);
+  if (error) {
+    return res.status(500).json({
+      error: 'Failed to save notice',
+      details: error.message
+    });
+  }
 
   return res.status(201).json({
     message: 'Notice created successfully',
-    notice
+    notice: data
   });
 });
 
 module.exports = router;
+``
